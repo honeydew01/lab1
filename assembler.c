@@ -1,3 +1,10 @@
+/*
+	Name 1: Andy Shen
+	Name 2: Fullname of the second partner 
+	UTEID 1: as224237
+	UTEID 2: UTEID of the second partner 
+*/
+
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
