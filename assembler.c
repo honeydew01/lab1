@@ -7,6 +7,10 @@
 FILE *infile = NULL;
 FILE *outfile = NULL;
 
+int* labels = {"ADD", "AND", "BRn", "BRz", "BRp", "BR", "BRzp", "BRnp", "BRnz", "BRnzp", "HALT", "JMP", "JSR", "JSRR", "LDB", "LDW",
+"LEA", "NOP", "NOT", "RET", "LSHF", "RSHFL", "RSHFA", "RTI", "STB", "STW", "TRAP", "XOR"};
+int numLabels = 25;
+
 int main(int argc, char* argv[]) {
     char *prgName   = NULL;
     char *iFileName = NULL;
