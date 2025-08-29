@@ -1,2 +1,7 @@
+CC = gcc
+CFLAGS = -std=c99 -Werror
 
-assembler: assembler.o
+all: 
+
+assembler: assembler.c
+	$(CC) -o assembler assembler.c

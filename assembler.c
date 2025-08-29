@@ -4,6 +4,9 @@
 #include <ctype.h>
 #include <limits.h>
 
+FILE *infile = NULL;
+FILE *outfile = NULL;
+
 int main(int argc, char* argv[]) {
     char *prgName   = NULL;
     char *iFileName = NULL;
@@ -22,16 +25,16 @@ int main(int argc, char* argv[]) {
     outfile = fopen(argv[2], "w");
         
     if (!infile) {
-    printf("Error: Cannot open file %s\n", argv[1]);
-    exit(4);
-        }
+        printf("Error: Cannot open file %s\n", argv[1]);
+        exit(4);
+    }
     if (!outfile) {
-    printf("Error: Cannot open file %s\n", argv[2]);
-    exit(4);
+        printf("Error: Cannot open file %s\n", argv[2]);
+        exit(4);
     }
 
     /* Do stuff with files */
 
     fclose(infile);
     fclose(outfile);
-    }
+}
