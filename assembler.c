@@ -106,6 +106,7 @@ int readAndParse(FILE *pInfile, char *pLine, char **pLabel, char **pOpcode, char
 int isOpcode(char *in);
 int toNum(char *pStr);
 int regToNum(char *reg_name);
+uint16_t offset_calc(uint16_t cur_addr, char* label_name, uint16_t num_bits);
 
 #define X(OPCODE_NAME) OPCODE_FUNC_PROTO(OPCODE_NAME);
 OPCODE_LIST
@@ -218,12 +219,14 @@ int convert_to_hex(FILE *infile, FILE *outfile) {
             return EXIT_SUCCESS;
         }
 
-        if (strncmp(lOpcode, ".fill", 5) == 0) {
-            fprintf(outfile, "0x%.04x\n", toNum(lArg1));
+        if (status == DONE || status == EMPTY_LINE) {
             continue;
         }
 
-        if (status == DONE || status == EMPTY_LINE) {
+        cur_address += 2;
+
+        if (strncmp(lOpcode, ".fill", 5) == 0) {
+            fprintf(outfile, "0x%.04x\n", toNum(lArg1));
             continue;
         }
 
@@ -452,6 +455,12 @@ int regToNum(char *reg_name) {
     return -1;
 }
 
+uint16_t offset_calc(uint16_t cur_addr, char* label_name, uint16_t num_bits){
+    st_entry *temp = search_sym(label_name);
+    uint16_t mask = 0xFFFF << num_bits;
+    return ((temp->addy - cur_addr)/2) & ~(mask);
+}
+
 OPCODE_FUNC_PROTO(add) {
     OPCODE_FUNC_INIT(0x1);
 
@@ -482,35 +491,36 @@ OPCODE_FUNC_PROTO(br) {
     OPCODE_FUNC_INIT(0x0);
 
     ret_val |= (0x7 << 9);
-    st_entry *temp = search_sym(arg1);
+
+    return ret_val | offset_calc(cur_addr, arg1, 9);
 }
 
 OPCODE_FUNC_PROTO(brn) {
-    return 0;
+    return OPCODE_FUNC_NAME(br)(cur_addr, opcode, arg1, arg2, arg3, arg4) ^ (0x3 << 9);
 }
 
 OPCODE_FUNC_PROTO(brz) {
-    return 0;
+    return OPCODE_FUNC_NAME(br)(cur_addr, opcode, arg1, arg2, arg3, arg4) ^ (0x5 << 9);
 }
 
 OPCODE_FUNC_PROTO(brp) {
-    return 0;
+    return OPCODE_FUNC_NAME(br)(cur_addr, opcode, arg1, arg2, arg3, arg4) ^ (0x6 << 9);
 }
 
 OPCODE_FUNC_PROTO(brzp) {
-    return 0;
+    return OPCODE_FUNC_NAME(br)(cur_addr, opcode, arg1, arg2, arg3, arg4) ^ (0x1 << 11);
 }
 
 OPCODE_FUNC_PROTO(brnp) {
-    return 0;
+    return OPCODE_FUNC_NAME(br)(cur_addr, opcode, arg1, arg2, arg3, arg4) ^ (0x1 << 10);
 }
 
 OPCODE_FUNC_PROTO(brnz) {
-    return 0;
+    return OPCODE_FUNC_NAME(br)(cur_addr, opcode, arg1, arg2, arg3, arg4) ^ (0x1 << 9);
 }
 
 OPCODE_FUNC_PROTO(brnzp) {
-    return 0;
+    return OPCODE_FUNC_NAME(br)(cur_addr, opcode, arg1, arg2, arg3, arg4);
 }
 
 OPCODE_FUNC_PROTO(halt) {
@@ -518,19 +528,25 @@ OPCODE_FUNC_PROTO(halt) {
 }
 
 OPCODE_FUNC_PROTO(jmp) {
-    return 0;
+    OPCODE_FUNC_INIT(0xC);
+    return ret_val | (regToNum(arg1) << 6);
 }
 
 OPCODE_FUNC_PROTO(jsr) {
-    return 0;
+    OPCODE_FUNC_INIT(0x4);
+    return ret_val | offset_calc(cur_addr, arg1, 11) | (1 << 11);
 }
 
 OPCODE_FUNC_PROTO(jsrr) {
-    return 0;
+    OPCODE_FUNC_INIT(0x4);
+    return ret_val | (regToNum(arg1) << 6);
 }
 
 OPCODE_FUNC_PROTO(ldb) {
-    return 0;
+    OPCODE_FUNC_INIT(0x2);
+    ret_val |= regToNum(arg1) << 9;
+    ret_val |= regToNum(arg2) << 6;
+    return ret_val | toNum(arg3);
 }
 
 OPCODE_FUNC_PROTO(ldw) {
@@ -550,7 +566,8 @@ OPCODE_FUNC_PROTO(not) {
 }
 
 OPCODE_FUNC_PROTO(ret) {
-    return 0;
+    OPCODE_FUNC_INIT(0xC);
+    return ret_val | (0x7 << 6);
 }
 
 OPCODE_FUNC_PROTO(lshf) {
