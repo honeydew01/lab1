@@ -5,6 +5,8 @@
     UTEID 2: jw63339
 */
 
+/* --------------------------------------------- Include defs ---------------------------------------------- */
+
 #include <ctype.h>
 #include <limits.h>
 #include <stdint.h>
@@ -13,58 +15,110 @@
 #include <string.h>
 #include <sys/stat.h>
 
+/* --------------------------------------------- Macro defs ------------------------------------------------ */
+
 #define MAX_LINE_LENGTH 255
 #define MAX_OPCODE_LENGTH 10
 #define MAX_SYMBOL_LENGTH 20
+#define MAX_REG_NAME_LENGTH 3
 
+#define REG_NAMES \
+    X(r0, 0)      \
+    X(r1, 1)      \
+    X(r2, 2)      \
+    X(r3, 3)      \
+    X(r4, 4)      \
+    X(r5, 5)      \
+    X(r6, 6)      \
+    X(r7, 7)      \
+    X(ssp, 6)     \
+    X(usp, 6)
+
+#define OPCODE_LIST \
+    X(add)          \
+    X(and)          \
+    X(br)           \
+    X(brn)          \
+    X(brz)          \
+    X(brp)          \
+    X(brzp)         \
+    X(brnp)         \
+    X(brnz)         \
+    X(brnzp)        \
+    X(halt)         \
+    X(jmp)          \
+    X(jsr)          \
+    X(jsrr)         \
+    X(ldb)          \
+    X(ldw)          \
+    X(lea)          \
+    X(nop)          \
+    X(not)          \
+    X(ret)          \
+    X(lshf)         \
+    X(rshfl)        \
+    X(rshfa)        \
+    X(rti)          \
+    X(stb)          \
+    X(stw)          \
+    X(trap)         \
+    X(xor)
+
+#define OPCODE_FUNC_NAME(opcode_name) op2hex_##opcode_name
+#define OPCODE_FUNC_SIGNATURE(opcode_name) uint16_t opcode_name(uint16_t cur_addr, char *opcode, char *arg1, char *arg2, char *arg3, char *arg4)
+#define OPCODE_FUNC_PROTO(opcode_name) OPCODE_FUNC_SIGNATURE(OPCODE_FUNC_NAME(opcode_name))
+#define OPCODE_FUNC_INIT(opcode_val) uint16_t ret_val = opcode_val << 12
+
+/* --------------------------------------------- Type defs ------------------------------------------------- */
+
+/* Return values for the readandparse function */
+enum {
+    DONE,
+    OK,
+    EMPTY_LINE
+};
+
+/* Struct to act as an entry in the symbol table where the symbol table is a linked list of entries */
 typedef struct st_entry {
     char symbol[MAX_SYMBOL_LENGTH];
     uint16_t addy;
     struct st_entry *next;
 } st_entry;
 
-enum {
-    DONE,
-    OK,
-    EMPTY_LINE,
-    INVALID_OPCODE
+typedef struct opcode_funcs {
+    const char *opcode;
+    OPCODE_FUNC_SIGNATURE((*func));
+} opcode_funcs;
+
+typedef struct reg_associations {
+    const char *reg_name;
+    int reg_val;
+} reg_associations;
+
+/* --------------------------------------------- Func prototypes ------------------------------------------- */
+
+int convert_to_hex(FILE *infile, FILE *outfile);
+int generate_symbol_table(FILE *infile);
+uint16_t proc_opcode(char *opcode, char *arg1, char *arg2, char *arg3, char *arg4);
+st_entry *new_sym_entry(char *sym_name, uint16_t addr);
+void print_sym_table();
+int readAndParse(FILE *pInfile, char *pLine, char **pLabel, char **pOpcode, char **pArg1, char **pArg2, char **pArg3, char **pArg4);
+int isOpcode(char *in);
+int toNum(char *pStr);
+int regToNum(char *reg_name);
+
+#define X(OPCODE_NAME) OPCODE_FUNC_PROTO(OPCODE_NAME);
+OPCODE_LIST
+#undef X
+
+/* --------------------------------------------- Constant defs --------------------------------------------- */
+
+static const opcode_funcs opcodes_dispach_table[] = {
+#define X(OPCODE_NAME) {#OPCODE_NAME, OPCODE_FUNC_NAME(OPCODE_NAME)},
+    OPCODE_LIST
+#undef X
 };
-
-FILE *infile = NULL;
-FILE *outfile = NULL;
-
-st_entry *SYM_TABLE = NULL;
-
-const char *const valid_opcodes[] = {
-    "add",
-    "and",
-    "br",
-    "brn",
-    "brz",
-    "brp",
-    "brzp",
-    "brnp",
-    "brnz",
-    "brnzp",
-    "halt",
-    "jmp",
-    "jsr",
-    "jsrr",
-    "ldb",
-    "ldw",
-    "lea",
-    "nop",
-    "not",
-    "ret",
-    "lshf",
-    "rshfl",
-    "rshfa",
-    "rti",
-    "stb",
-    "stw",
-    "trap",
-    "xor"};
-const int num_valid_opcodes = sizeof(valid_opcodes) / sizeof(const char *const);
+const int num_valid_opcodes = sizeof(opcodes_dispach_table) / sizeof(opcode_funcs);
 
 const char *const valid_pseudo_ops[] = {
     ".orig",
@@ -72,12 +126,20 @@ const char *const valid_pseudo_ops[] = {
     ".fill"};
 const int num_valid_pseudo_ops = sizeof(valid_pseudo_ops) / sizeof(const char *const);
 
-st_entry *new_sym_entry(char *sym_name, uint16_t addr);
-int generate_symbol_table(FILE *infile);
-void print_sym_table();
-int readAndParse(FILE *pInfile, char *pLine, char **pLabel, char **pOpcode, char **pArg1, char **pArg2, char **pArg3, char **pArg4);
-int isOpcode(char *in);
-int toNum(char *pStr);
+static const reg_associations valid_reg_names[] = {
+#define X(reg_name, reg_value) {#reg_name, reg_value},
+    REG_NAMES
+#undef X
+};
+const int num_valid_reg_names = sizeof(valid_reg_names) / sizeof(reg_associations);
+
+/* --------------------------------------------- Global defs ----------------------------------------------- */
+
+FILE *infile = NULL;
+FILE *outfile = NULL;
+st_entry *SYM_TABLE = NULL;
+
+/* --------------------------------------------- Main ------------------------------------------------------ */
 
 int main(int argc, char *argv[]) {
     struct stat in_info, out_info;
@@ -111,27 +173,72 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
     }
 
-    generate_symbol_table(infile);
-    print_sym_table();
+    int status = generate_symbol_table(infile);
+    if (status != EXIT_SUCCESS) {
+        exit(EXIT_FAILURE);
+    }
 
-    exit(EXIT_SUCCESS);
     fseek(infile, 0, SEEK_SET);
-    char line_buff[MAX_LINE_LENGTH + 1], *lLabel, *lOpcode, *lArg1, *lArg2, *lArg3, *lArg4;
-    int status;
-
-    do {
-        status = readAndParse(infile, line_buff, &lLabel, &lOpcode, &lArg1, &lArg2, &lArg3, &lArg4);
-        if (status == INVALID_OPCODE) {  // Check if the parsed output has a valid opcode
-            exit(EXIT_FAILURE);
-        }
-
-        if (status != DONE && status != EMPTY_LINE) {
-            printf("Line: %s\n\tLabel:  %s\n\tOpcode: %s\n\tArg1: %s\n\tArg2: %s\n\tArg3: %s\n\tArg4: %s\n", line_buff, lLabel, lOpcode, lArg1, lArg2, lArg3, lArg4);
-        }
-    } while (status != DONE);
+    status = convert_to_hex(infile, outfile);
+    if (status != EXIT_SUCCESS) {
+        exit(EXIT_FAILURE);
+    }
 
     fclose(infile);
     fclose(outfile);
+
+    /* Clean up sym table */
+    st_entry *pST_entry = SYM_TABLE;
+    while (pST_entry != NULL) {
+        st_entry *temp = pST_entry;
+        pST_entry = temp->next;
+        free(temp);
+    }
+}
+
+/* --------------------------------------------- Func defs ------------------------------------------------- */
+
+int convert_to_hex(FILE *infile, FILE *outfile) {
+    char line_buff[MAX_LINE_LENGTH + 1], *lLabel, *lOpcode, *lArg1, *lArg2, *lArg3, *lArg4;
+    int status;
+    uint16_t cur_address = 0;
+
+    do {
+        status = readAndParse(infile, line_buff, &lLabel, &lOpcode, &lArg1, &lArg2, &lArg3, &lArg4);
+
+        if (cur_address == 0x0) {
+            if (strncmp(lOpcode, ".orig", 5) == 0) {
+                cur_address = toNum(lArg1);
+                fprintf(outfile, "0x%.04x\n", cur_address);
+                continue;
+            }
+        }
+
+        if (strncmp(lOpcode, ".end", 4) == 0) {
+            return EXIT_SUCCESS;
+        }
+
+        if (strncmp(lOpcode, ".fill", 5) == 0) {
+            fprintf(outfile, "0x%.04x\n", toNum(lArg1));
+            continue;
+        }
+
+        if (status == DONE || status == EMPTY_LINE) {
+            continue;
+        }
+
+        uint16_t temp_instr;
+        for (int i = 0; i < num_valid_opcodes; i++) {
+            if (strncmp(lOpcode, opcodes_dispach_table[i].opcode, MAX_OPCODE_LENGTH) == 0) {
+                temp_instr = opcodes_dispach_table[i].func(cur_address, lOpcode, lArg1, lArg2, lArg3, lArg4);
+                break;
+            }
+        }
+
+        fprintf(outfile, "0x%.4x\n", temp_instr);
+
+    } while (status != DONE);
+    return EXIT_SUCCESS;
 }
 
 int generate_symbol_table(FILE *infile) {
@@ -185,6 +292,23 @@ int generate_symbol_table(FILE *infile) {
     } while (status != DONE);
 }
 
+st_entry *search_sym(char *sym_name) {
+    if (SYM_TABLE == NULL) {
+        fprintf(stderr, "No symbols in the symbol table!\n");
+        return NULL;
+    }
+
+    /* Standard LL traversal */
+    st_entry *pST_entry = SYM_TABLE;
+    do {
+        if (strncmp(sym_name, pST_entry->symbol, MAX_SYMBOL_LENGTH) == 0) {
+            return pST_entry;
+        }
+
+        pST_entry = pST_entry->next;
+    } while (pST_entry != NULL);
+}
+
 st_entry *new_sym_entry(char *sym_name, uint16_t addr) {
     st_entry *new_entry = (st_entry *)calloc(1, sizeof(st_entry));
     strncpy(new_entry->symbol, sym_name, MAX_SYMBOL_LENGTH * sizeof(char));
@@ -202,7 +326,7 @@ void print_sym_table() {
 
 int isOpcode(char *in) {
     for (int i = 0; i < num_valid_opcodes; i++) {
-        if (strncmp(in, valid_opcodes[i], MAX_OPCODE_LENGTH) == 0) {
+        if (strncmp(in, opcodes_dispach_table[i].opcode, MAX_OPCODE_LENGTH) == 0) {
             return EXIT_SUCCESS;
         }
     }
@@ -317,4 +441,146 @@ int toNum(char *pStr) {
         printf("Error: invalid operand, %s\n", orig_pStr);
         exit(4); /* This has been changed from error code 3 to error code 4, see clarification 12 */
     }
+}
+
+int regToNum(char *reg_name) {
+    for (int i = 0; i < num_valid_reg_names; i++) {
+        if (strncmp(reg_name, valid_reg_names[i].reg_name, MAX_REG_NAME_LENGTH) == 0) {
+            return valid_reg_names[i].reg_val;
+        }
+    }
+    return -1;
+}
+
+OPCODE_FUNC_PROTO(add) {
+    OPCODE_FUNC_INIT(0x1);
+
+    ret_val |= (regToNum(arg1) << 9);
+    ret_val |= (regToNum(arg2) << 6);
+
+    uint16_t sr2;
+    if (sr2 = regToNum(arg3) != -1) {
+        return ret_val | sr2;
+    }
+    return ret_val | (toNum(arg3) & 0x1F) | (1 << 5);
+}
+
+OPCODE_FUNC_PROTO(and) {
+    OPCODE_FUNC_INIT(0x5);
+
+    ret_val |= (regToNum(arg1) << 9);
+    ret_val |= (regToNum(arg2) << 6);
+
+    uint16_t sr2;
+    if (sr2 = regToNum(arg3) != -1) {
+        return ret_val | sr2;
+    }
+    return ret_val | (toNum(arg3) & 0x1F) | (1 << 5);
+}
+
+OPCODE_FUNC_PROTO(br) {
+    OPCODE_FUNC_INIT(0x0);
+
+    ret_val |= (0x7 << 9);
+    st_entry *temp = search_sym(arg1);
+}
+
+OPCODE_FUNC_PROTO(brn) {
+    return 0;
+}
+
+OPCODE_FUNC_PROTO(brz) {
+    return 0;
+}
+
+OPCODE_FUNC_PROTO(brp) {
+    return 0;
+}
+
+OPCODE_FUNC_PROTO(brzp) {
+    return 0;
+}
+
+OPCODE_FUNC_PROTO(brnp) {
+    return 0;
+}
+
+OPCODE_FUNC_PROTO(brnz) {
+    return 0;
+}
+
+OPCODE_FUNC_PROTO(brnzp) {
+    return 0;
+}
+
+OPCODE_FUNC_PROTO(halt) {
+    return 0;
+}
+
+OPCODE_FUNC_PROTO(jmp) {
+    return 0;
+}
+
+OPCODE_FUNC_PROTO(jsr) {
+    return 0;
+}
+
+OPCODE_FUNC_PROTO(jsrr) {
+    return 0;
+}
+
+OPCODE_FUNC_PROTO(ldb) {
+    return 0;
+}
+
+OPCODE_FUNC_PROTO(ldw) {
+    return 0;
+}
+
+OPCODE_FUNC_PROTO(lea) {
+    return 0;
+}
+
+OPCODE_FUNC_PROTO(nop) {
+    return 0;
+}
+
+OPCODE_FUNC_PROTO(not) {
+    return 0;
+}
+
+OPCODE_FUNC_PROTO(ret) {
+    return 0;
+}
+
+OPCODE_FUNC_PROTO(lshf) {
+    return 0;
+}
+
+OPCODE_FUNC_PROTO(rshfl) {
+    return 0;
+}
+
+OPCODE_FUNC_PROTO(rshfa) {
+    return 0;
+}
+
+OPCODE_FUNC_PROTO(rti) {
+    return 0;
+}
+
+OPCODE_FUNC_PROTO(stb) {
+    return 0;
+}
+
+OPCODE_FUNC_PROTO(stw) {
+    return 0;
+}
+
+OPCODE_FUNC_PROTO(trap) {
+    return 0;
+}
+
+OPCODE_FUNC_PROTO(xor) {
+    return 0;
 }
