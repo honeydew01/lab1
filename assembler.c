@@ -99,7 +99,6 @@ typedef struct reg_associations {
 
 int convert_to_hex(FILE *infile, FILE *outfile);
 int generate_symbol_table(FILE *infile);
-uint16_t proc_opcode(char *opcode, char *arg1, char *arg2, char *arg3, char *arg4);
 st_entry *new_sym_entry(char *sym_name, uint16_t addr);
 void print_sym_table();
 int readAndParse(FILE *pInfile, char *pLine, char **pLabel, char **pOpcode, char **pArg1, char **pArg2, char **pArg3, char **pArg4);
@@ -210,7 +209,7 @@ int convert_to_hex(FILE *infile, FILE *outfile) {
         if (cur_address == 0x0) {
             if (strncmp(lOpcode, ".orig", 5) == 0) {
                 cur_address = toNum(lArg1);
-                fprintf(outfile, "0x%.04x\n", cur_address);
+                fprintf(outfile, "0x%.04X\n", cur_address);
                 continue;
             }
         }
@@ -226,7 +225,7 @@ int convert_to_hex(FILE *infile, FILE *outfile) {
         cur_address += 2;
 
         if (strncmp(lOpcode, ".fill", 5) == 0) {
-            fprintf(outfile, "0x%.04x\n", toNum(lArg1));
+            fprintf(outfile, "0x%.04X\n", toNum(lArg1));
             continue;
         }
 
@@ -238,7 +237,7 @@ int convert_to_hex(FILE *infile, FILE *outfile) {
             }
         }
 
-        fprintf(outfile, "0x%.4x\n", temp_instr);
+        fprintf(outfile, "0x%.04X\n", temp_instr);
 
     } while (status != DONE);
     return EXIT_SUCCESS;
@@ -283,7 +282,7 @@ int generate_symbol_table(FILE *infile) {
         st_entry *pST_entry = SYM_TABLE;
         while (pST_entry->next != NULL) {
             if (strcmp(lLabel, pST_entry->symbol) == 0) {
-                fprintf(stderr, "Label: %s, is already defined at address %04x.\n", lLabel, pST_entry->addy);
+                fprintf(stderr, "Label: %s, is already defined at address %.04X.\n", lLabel, pST_entry->addy);
                 return EXIT_FAILURE;
             }
             pST_entry = pST_entry->next;
@@ -322,7 +321,7 @@ st_entry *new_sym_entry(char *sym_name, uint16_t addr) {
 void print_sym_table() {
     st_entry *pST_entry = SYM_TABLE;
     while (pST_entry != NULL) {
-        printf("ADR: 0x%04x\tSYM: %s\n", pST_entry->addy, pST_entry->symbol);
+        printf("ADR: 0x%.04X\tSYM: %s\n", pST_entry->addy, pST_entry->symbol);
         pST_entry = pST_entry->next;
     }
 }
@@ -448,7 +447,9 @@ int toNum(char *pStr) {
 
 int regToNum(char *reg_name) {
     for (int i = 0; i < num_valid_reg_names; i++) {
+        printf("Reg %s\n\tChecking against: %s, %d\n", reg_name, valid_reg_names[i].reg_name, valid_reg_names[i].reg_val);
         if (strncmp(reg_name, valid_reg_names[i].reg_name, MAX_REG_NAME_LENGTH) == 0) {
+            printf("\tDone, returning: %d\n", valid_reg_names[i].reg_val);
             return valid_reg_names[i].reg_val;
         }
     }
@@ -467,8 +468,8 @@ OPCODE_FUNC_PROTO(add) {
     ret_val |= (regToNum(arg1) << 9);
     ret_val |= (regToNum(arg2) << 6);
 
-    uint16_t sr2;
-    if (sr2 = regToNum(arg3) != -1) {
+    if (arg3[0] != '#') {
+        uint16_t sr2 = regToNum(arg3);
         return ret_val | sr2;
     }
     return ret_val | (toNum(arg3) & 0x1F) | (1 << 5);
@@ -480,8 +481,8 @@ OPCODE_FUNC_PROTO(and) {
     ret_val |= (regToNum(arg1) << 9);
     ret_val |= (regToNum(arg2) << 6);
 
-    uint16_t sr2;
-    if (sr2 = regToNum(arg3) != -1) {
+    if (arg3[0] != '#') {
+        uint16_t sr2 = regToNum(arg3);
         return ret_val | sr2;
     }
     return ret_val | (toNum(arg3) & 0x1F) | (1 << 5);
