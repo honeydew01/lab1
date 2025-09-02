@@ -19,7 +19,7 @@
 
 #define MAX_LINE_LENGTH 255
 #define MAX_OPCODE_LENGTH 10
-#define MAX_SYMBOL_LENGTH 20
+#define MAX_SYMBOL_LENGTH 12
 #define MAX_REG_NAME_LENGTH 3
 
 #define REG_NAMES \
@@ -447,9 +447,9 @@ int toNum(char *pStr) {
 
 int regToNum(char *reg_name) {
     for (int i = 0; i < num_valid_reg_names; i++) {
-        printf("Reg %s\n\tChecking against: %s, %d\n", reg_name, valid_reg_names[i].reg_name, valid_reg_names[i].reg_val);
+        // printf("Reg %s\n\tChecking against: %s, %d\n", reg_name, valid_reg_names[i].reg_name, valid_reg_names[i].reg_val);
         if (strncmp(reg_name, valid_reg_names[i].reg_name, MAX_REG_NAME_LENGTH) == 0) {
-            printf("\tDone, returning: %d\n", valid_reg_names[i].reg_val);
+            // printf("\tDone, returning: %d\n", valid_reg_names[i].reg_val);
             return valid_reg_names[i].reg_val;
         }
     }
@@ -468,7 +468,7 @@ OPCODE_FUNC_PROTO(add) {
     ret_val |= (regToNum(arg1) << 9);
     ret_val |= (regToNum(arg2) << 6);
 
-    if (arg3[0] != '#') {
+    if (arg3[0] != '#' && arg3[0] != 'x' && arg3[0] != 'X') {
         uint16_t sr2 = regToNum(arg3);
         return ret_val | sr2;
     }
@@ -481,7 +481,7 @@ OPCODE_FUNC_PROTO(and) {
     ret_val |= (regToNum(arg1) << 9);
     ret_val |= (regToNum(arg2) << 6);
 
-    if (arg3[0] != '#') {
+    if (arg3[0] != '#' && arg3[0] != 'x' && arg3[0] != 'X') {
         uint16_t sr2 = regToNum(arg3);
         return ret_val | sr2;
     }
@@ -490,42 +490,55 @@ OPCODE_FUNC_PROTO(and) {
 
 OPCODE_FUNC_PROTO(br) {
     OPCODE_FUNC_INIT(0x0);
-
     ret_val |= (0x7 << 9);
-
     return ret_val | offset_calc(cur_addr, arg1, 9);
 }
 
 OPCODE_FUNC_PROTO(brn) {
-    return OPCODE_FUNC_NAME(br)(cur_addr, opcode, arg1, arg2, arg3, arg4) ^ (0x3 << 9);
+    OPCODE_FUNC_INIT(0x0);
+    ret_val |= (0x4 << 9);
+    return ret_val | offset_calc(cur_addr, arg1, 9);
 }
 
 OPCODE_FUNC_PROTO(brz) {
-    return OPCODE_FUNC_NAME(br)(cur_addr, opcode, arg1, arg2, arg3, arg4) ^ (0x5 << 9);
+    OPCODE_FUNC_INIT(0x0);
+    ret_val |= (0x2 << 9);
+    return ret_val | offset_calc(cur_addr, arg1, 9);
 }
 
 OPCODE_FUNC_PROTO(brp) {
-    return OPCODE_FUNC_NAME(br)(cur_addr, opcode, arg1, arg2, arg3, arg4) ^ (0x6 << 9);
+    OPCODE_FUNC_INIT(0x0);
+    ret_val |= (0x1 << 9);
+    return ret_val | offset_calc(cur_addr, arg1, 9);
 }
 
 OPCODE_FUNC_PROTO(brzp) {
-    return OPCODE_FUNC_NAME(br)(cur_addr, opcode, arg1, arg2, arg3, arg4) ^ (0x1 << 11);
+    OPCODE_FUNC_INIT(0x0);
+    ret_val |= (0x3 << 9);
+    return ret_val | offset_calc(cur_addr, arg1, 9);
 }
 
 OPCODE_FUNC_PROTO(brnp) {
-    return OPCODE_FUNC_NAME(br)(cur_addr, opcode, arg1, arg2, arg3, arg4) ^ (0x1 << 10);
+    OPCODE_FUNC_INIT(0x0);
+    ret_val |= (0x5 << 9);
+    return ret_val | offset_calc(cur_addr, arg1, 9);
 }
 
 OPCODE_FUNC_PROTO(brnz) {
-    return OPCODE_FUNC_NAME(br)(cur_addr, opcode, arg1, arg2, arg3, arg4) ^ (0x1 << 9);
+    OPCODE_FUNC_INIT(0x0);
+    ret_val |= (0x6 << 9);
+    return ret_val | offset_calc(cur_addr, arg1, 9);
 }
 
 OPCODE_FUNC_PROTO(brnzp) {
-    return OPCODE_FUNC_NAME(br)(cur_addr, opcode, arg1, arg2, arg3, arg4);
+    OPCODE_FUNC_INIT(0x0);
+    ret_val |= (0x7 << 9);
+    return ret_val | offset_calc(cur_addr, arg1, 9);
 }
 
 OPCODE_FUNC_PROTO(halt) {
-    return 0;
+    OPCODE_FUNC_INIT(0xF);
+    return ret_val | 0x25;
 }
 
 OPCODE_FUNC_PROTO(jmp) {
@@ -551,11 +564,16 @@ OPCODE_FUNC_PROTO(ldb) {
 }
 
 OPCODE_FUNC_PROTO(ldw) {
-    return 0;
+    OPCODE_FUNC_INIT(0x6);
+    ret_val |= regToNum(arg1) << 9;
+    ret_val |= regToNum(arg2) << 6;
+    return ret_val | (toNum(arg3) & 0x3F);
 }
 
 OPCODE_FUNC_PROTO(lea) {
-    return 0;
+    OPCODE_FUNC_INIT(0xE);
+    ret_val |= regToNum(arg1) << 9;
+    return ret_val | offset_calc(cur_addr, arg2, 9);
 }
 
 OPCODE_FUNC_PROTO(nop) {
@@ -563,7 +581,11 @@ OPCODE_FUNC_PROTO(nop) {
 }
 
 OPCODE_FUNC_PROTO(not) {
-    return 0;
+    OPCODE_FUNC_INIT(0x9);
+    ret_val |= regToNum(arg1) << 9;
+    ret_val |= regToNum(arg2) << 6;
+    ret_val |= 0x3F;
+    return ret_val;
 }
 
 OPCODE_FUNC_PROTO(ret) {
@@ -572,33 +594,58 @@ OPCODE_FUNC_PROTO(ret) {
 }
 
 OPCODE_FUNC_PROTO(lshf) {
-    return 0;
+    OPCODE_FUNC_INIT(0xD); 
+    ret_val |= regToNum(arg1) << 9;
+    ret_val |= regToNum(arg2) << 6;
+    return ret_val | (toNum(arg3) & 0xF);
 }
 
 OPCODE_FUNC_PROTO(rshfl) {
-    return 0;
+    OPCODE_FUNC_INIT(0xD);
+    ret_val |= regToNum(arg1) << 9;
+    ret_val |= regToNum(arg2) << 6;
+    return ret_val | (toNum(arg3) & 0xF) | (1 << 4);
 }
 
 OPCODE_FUNC_PROTO(rshfa) {
-    return 0;
+    OPCODE_FUNC_INIT(0xD);
+    ret_val |= regToNum(arg1) << 9;
+    ret_val |= regToNum(arg2) << 6;
+    return ret_val | (toNum(arg3) & 0xF) | (3 << 4);
 }
 
 OPCODE_FUNC_PROTO(rti) {
-    return 0;
+    OPCODE_FUNC_INIT(0x8);
+    return ret_val;
 }
 
 OPCODE_FUNC_PROTO(stb) {
-    return 0;
+    OPCODE_FUNC_INIT(0x3);
+    ret_val |= regToNum(arg1) << 9;
+    ret_val |= regToNum(arg2) << 6;
+    return ret_val | (toNum(arg3) & 0x3F);
 }
 
 OPCODE_FUNC_PROTO(stw) {
-    return 0;
+    OPCODE_FUNC_INIT(0x7);
+    ret_val |= regToNum(arg1) << 9;
+    ret_val |= regToNum(arg2) << 6;
+    return ret_val | (toNum(arg3) & 0x3F);
 }
 
 OPCODE_FUNC_PROTO(trap) {
-    return 0;
+    OPCODE_FUNC_INIT(0xF);
+    return ret_val | (toNum(arg1) & 0xFF);
 }
 
 OPCODE_FUNC_PROTO(xor) {
-    return 0;
+    OPCODE_FUNC_INIT(0x9);
+    ret_val |= regToNum(arg1) << 9;
+    ret_val |= regToNum(arg2) << 6;
+    if (arg3[0] != '#' && arg3[0] != 'x' && arg3[0] != 'X') {
+        ret_val |= regToNum(arg3);
+    } else {
+        ret_val |= 0x20 | (toNum(arg3) & 0x1F);
+    }
+    return ret_val;
 }
