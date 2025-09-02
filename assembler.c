@@ -19,7 +19,7 @@
 
 #define MAX_LINE_LENGTH 255
 #define MAX_OPCODE_LENGTH 10
-#define MAX_SYMBOL_LENGTH 12
+#define MAX_SYMBOL_LENGTH 20 /* I think should be kept at 20 as per lab 1 instructions */
 #define MAX_REG_NAME_LENGTH 3
 
 #define REG_NAMES \
@@ -106,6 +106,7 @@ int isOpcode(char *in);
 int toNum(char *pStr);
 int regToNum(char *reg_name);
 uint16_t offset_calc(uint16_t cur_addr, char* label_name, uint16_t num_bits);
+int is_imm(char *arg);
 
 #define X(OPCODE_NAME) OPCODE_FUNC_PROTO(OPCODE_NAME);
 OPCODE_LIST
@@ -194,6 +195,7 @@ int main(int argc, char *argv[]) {
         pST_entry = temp->next;
         free(temp);
     }
+    exit(EXIT_SUCCESS);
 }
 
 /* --------------------------------------------- Func defs ------------------------------------------------- */
@@ -462,13 +464,17 @@ uint16_t offset_calc(uint16_t cur_addr, char* label_name, uint16_t num_bits){
     return ((temp->addy - cur_addr)/2) & ~(mask);
 }
 
+int is_imm(char *arg){
+    return (*arg == '#') | (*arg == 'x'); /* We don't need to check 'X' because everything is lowercased by the read_and_parse function */
+}
+
 OPCODE_FUNC_PROTO(add) {
     OPCODE_FUNC_INIT(0x1);
 
     ret_val |= (regToNum(arg1) << 9);
     ret_val |= (regToNum(arg2) << 6);
 
-    if (arg3[0] != '#' && arg3[0] != 'x' && arg3[0] != 'X') {
+    if (!is_imm(arg3)) {
         uint16_t sr2 = regToNum(arg3);
         return ret_val | sr2;
     }
@@ -481,7 +487,7 @@ OPCODE_FUNC_PROTO(and) {
     ret_val |= (regToNum(arg1) << 9);
     ret_val |= (regToNum(arg2) << 6);
 
-    if (arg3[0] != '#' && arg3[0] != 'x' && arg3[0] != 'X') {
+    if (!is_imm(arg3)) {
         uint16_t sr2 = regToNum(arg3);
         return ret_val | sr2;
     }
@@ -642,7 +648,7 @@ OPCODE_FUNC_PROTO(xor) {
     OPCODE_FUNC_INIT(0x9);
     ret_val |= regToNum(arg1) << 9;
     ret_val |= regToNum(arg2) << 6;
-    if (arg3[0] != '#' && arg3[0] != 'x' && arg3[0] != 'X') {
+    if (!is_imm(arg3)) {
         ret_val |= regToNum(arg3);
     } else {
         ret_val |= 0x20 | (toNum(arg3) & 0x1F);
