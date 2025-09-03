@@ -18,9 +18,9 @@
 /* --------------------------------------------- Macro defs ------------------------------------------------ */
 
 #define MAX_LINE_LENGTH 255
-#define MAX_OPCODE_LENGTH 10
-#define MAX_SYMBOL_LENGTH 20 /* I think should be kept at 20 as per lab 1 instructions */
-#define MAX_REG_NAME_LENGTH 3
+#define MAX_OPCODE_LENGTH 10  /* Arbitrary right now */
+#define MAX_SYMBOL_LENGTH 20  /* I think should be kept at 20 as per lab 1 instructions */
+#define MAX_REG_NAME_LENGTH 3 /* Arbitrary right now */
 
 #define REG_NAMES \
     X(r0, 0)      \
@@ -105,7 +105,7 @@ int readAndParse(FILE *pInfile, char *pLine, char **pLabel, char **pOpcode, char
 int isOpcode(char *in);
 int toNum(char *pStr);
 int regToNum(char *reg_name);
-uint16_t offset_calc(uint16_t cur_addr, char* label_name, uint16_t num_bits);
+uint16_t offset_calc(uint16_t cur_addr, char *label_name, uint16_t num_bits);
 int is_imm(char *arg);
 
 #define X(OPCODE_NAME) OPCODE_FUNC_PROTO(OPCODE_NAME);
@@ -124,7 +124,8 @@ const int num_valid_opcodes = sizeof(opcodes_dispach_table) / sizeof(opcode_func
 const char *const valid_pseudo_ops[] = {
     ".orig",
     ".end",
-    ".fill"};
+    ".fill",
+};
 const int num_valid_pseudo_ops = sizeof(valid_pseudo_ops) / sizeof(const char *const);
 
 static const reg_associations valid_reg_names[] = {
@@ -136,14 +137,14 @@ const int num_valid_reg_names = sizeof(valid_reg_names) / sizeof(reg_association
 
 /* --------------------------------------------- Global defs ----------------------------------------------- */
 
-FILE *infile = NULL;
-FILE *outfile = NULL;
 st_entry *SYM_TABLE = NULL;
 
 /* --------------------------------------------- Main ------------------------------------------------------ */
 
 int main(int argc, char *argv[]) {
     struct stat in_info, out_info;
+    FILE *infile = NULL;
+    FILE *outfile = NULL;
 
     if (argc != 3) { /* Check program usage */
         fprintf(stderr, "Usage: %s <input_file> <output_file>\n", argv[0]);
@@ -174,11 +175,13 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
     }
 
+    /* Pass 1 */
     int status = generate_symbol_table(infile);
     if (status != EXIT_SUCCESS) {
         exit(EXIT_FAILURE);
     }
 
+    /* Pass 2 */
     fseek(infile, 0, SEEK_SET);
     status = convert_to_hex(infile, outfile);
     if (status != EXIT_SUCCESS) {
@@ -200,6 +203,13 @@ int main(int argc, char *argv[]) {
 
 /* --------------------------------------------- Func defs ------------------------------------------------- */
 
+/**
+ * @brief Performs the second pass of the assembler. Converts the context-less asm code into hex using the global symbol table.
+ * 
+ * @param infile Input file handle
+ * @param outfile Output file handle
+ * @return int EXIT_SUCCESS or EXIT_FAILURE
+ */
 int convert_to_hex(FILE *infile, FILE *outfile) {
     char line_buff[MAX_LINE_LENGTH + 1], *lLabel, *lOpcode, *lArg1, *lArg2, *lArg3, *lArg4;
     int status;
@@ -208,6 +218,7 @@ int convert_to_hex(FILE *infile, FILE *outfile) {
     do {
         status = readAndParse(infile, line_buff, &lLabel, &lOpcode, &lArg1, &lArg2, &lArg3, &lArg4);
 
+        /* If cur_address is 0, then we did not find the .orig pseudop yet */
         if (cur_address == 0x0) {
             if (strncmp(lOpcode, ".orig", 5) == 0) {
                 cur_address = toNum(lArg1);
@@ -245,6 +256,12 @@ int convert_to_hex(FILE *infile, FILE *outfile) {
     return EXIT_SUCCESS;
 }
 
+/**
+ * @brief Performs the assembler's first pass. Collects labels in a symbol table. 
+ * 
+ * @param infile Input file 
+ * @return int EXIT_SUCCESS or EXIT_FAILURE
+ */
 int generate_symbol_table(FILE *infile) {
     char line_buff[MAX_LINE_LENGTH + 1], *lLabel, *lOpcode, *lArg1, *lArg2, *lArg3, *lArg4;
     int status;
@@ -274,7 +291,7 @@ int generate_symbol_table(FILE *infile) {
         }
 
         /* Potentially detected new symbol. Compare with existing symbols and append if good */
-        if (SYM_TABLE == NULL) {
+        if (SYM_TABLE == NULL) { /* If first symbol found */
             SYM_TABLE = new_sym_entry(lLabel, cur_address);
             cur_address += 2;
             continue;
@@ -294,8 +311,15 @@ int generate_symbol_table(FILE *infile) {
         pST_entry->next = new_sym_entry(lLabel, cur_address);
         cur_address += 2;
     } while (status != DONE);
+    return EXIT_SUCCESS;
 }
 
+/**
+ * @brief Searches for a label in the symbol table
+ * 
+ * @param sym_name Pointer to a string to search for.
+ * @return st_entry* The entry in the symbol table.
+ */
 st_entry *search_sym(char *sym_name) {
     if (SYM_TABLE == NULL) {
         fprintf(stderr, "No symbols in the symbol table!\n");
@@ -311,6 +335,7 @@ st_entry *search_sym(char *sym_name) {
 
         pST_entry = pST_entry->next;
     } while (pST_entry != NULL);
+    return EXIT_SUCCESS;
 }
 
 st_entry *new_sym_entry(char *sym_name, uint16_t addr) {
@@ -320,6 +345,7 @@ st_entry *new_sym_entry(char *sym_name, uint16_t addr) {
     return new_entry;
 }
 
+/* For debug */
 void print_sym_table() {
     st_entry *pST_entry = SYM_TABLE;
     while (pST_entry != NULL) {
@@ -458,13 +484,13 @@ int regToNum(char *reg_name) {
     return -1;
 }
 
-uint16_t offset_calc(uint16_t cur_addr, char* label_name, uint16_t num_bits){
+uint16_t offset_calc(uint16_t cur_addr, char *label_name, uint16_t num_bits) {
     st_entry *temp = search_sym(label_name);
     uint16_t mask = 0xFFFF << num_bits;
-    return ((temp->addy - cur_addr)/2) & ~(mask);
+    return ((temp->addy - cur_addr) / 2) & ~(mask);
 }
 
-int is_imm(char *arg){
+int is_imm(char *arg) {
     return (*arg == '#') | (*arg == 'x'); /* We don't need to check 'X' because everything is lowercased by the read_and_parse function */
 }
 
@@ -600,7 +626,7 @@ OPCODE_FUNC_PROTO(ret) {
 }
 
 OPCODE_FUNC_PROTO(lshf) {
-    OPCODE_FUNC_INIT(0xD); 
+    OPCODE_FUNC_INIT(0xD);
     ret_val |= regToNum(arg1) << 9;
     ret_val |= regToNum(arg2) << 6;
     return ret_val | (toNum(arg3) & 0xF);
