@@ -6,9 +6,6 @@
     LEA R0, f2_adr      ; Get factor 2 Address
     LDB R2, R0, #0      ; Load factor 2 into R2
 
-    ; RSHFL R2, R2, 8     ; Right shift the second factor to the top byte of R2. 
-    ; Looks like we'll only be given unsigned integers
-
     AND R3, R3, #0      ; Initialize product to 0
     AND R4, R4, #0      ; Initialize overflow to 0
 
@@ -22,15 +19,15 @@ CONTINUE LSHF R1, R1, #1 ; Left shift factor 1
     RSHFL R2, R2, #1    ; Right shift factor 2
     BR LOOP
     
-EXIT AND R5, R3, #0
+EXIT AND R5, R5, #0     ; Clear R5
     LSHF R5, R3, #8     ; Check top byte for overflow
-    BRn NO_OVER
+    BRn NO_OVERFLOW
     ADD R4, R4, #1      ; Indicate overflow
     
-NO_OVER LEA R1, P_adr       ; Get product address
-    STB R3, R1, #0      ; Store product into mem
+NO_OVERFLOW LEA R1, P_adr ; Get product address
+    STB R3, R1, #0      ; Store product into memory
     LEA R1, OF_adr      ; Get overflow address
-    STB R4, R1, #0      ; Store overflow into mem
+    STB R4, R1, #0      ; Store overflow into memory
 
 f1_adr .FILL	x3100   ; Factor 1 Address
 f2_adr .FILL	x3101   ; Factor 2 Address
