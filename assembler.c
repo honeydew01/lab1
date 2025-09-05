@@ -138,6 +138,7 @@ const int num_valid_reg_names = sizeof(valid_reg_names) / sizeof(reg_association
 /* --------------------------------------------- Global defs ----------------------------------------------- */
 
 st_entry *SYM_TABLE = NULL;
+int line_num;
 
 /* --------------------------------------------- Main ------------------------------------------------------ */
 
@@ -178,6 +179,7 @@ int main(int argc, char *argv[]) {
     /* Pass 1 */
     int status = generate_symbol_table(infile);
     if (status != EXIT_SUCCESS) {
+        fprintf(stderr, "Problem generating symbol table. Stopped at line: %d\n", line_num);
         exit(EXIT_FAILURE);
     }
 
@@ -185,6 +187,7 @@ int main(int argc, char *argv[]) {
     fseek(infile, 0, SEEK_SET);
     status = convert_to_hex(infile, outfile);
     if (status != EXIT_SUCCESS) {
+        fprintf(stderr, "Problem converting asm to hex. Stopped at line %d\n", line_num);
         exit(EXIT_FAILURE);
     }
 
@@ -205,7 +208,7 @@ int main(int argc, char *argv[]) {
 
 /**
  * @brief Performs the second pass of the assembler. Converts the context-less asm code into hex using the global symbol table.
- * 
+ *
  * @param infile Input file handle
  * @param outfile Output file handle
  * @return int EXIT_SUCCESS or EXIT_FAILURE
@@ -214,8 +217,9 @@ int convert_to_hex(FILE *infile, FILE *outfile) {
     char line_buff[MAX_LINE_LENGTH + 1], *lLabel, *lOpcode, *lArg1, *lArg2, *lArg3, *lArg4;
     int status;
     uint16_t cur_address = 0;
-
+    line_num = 0;
     do {
+        line_num++;
         status = readAndParse(infile, line_buff, &lLabel, &lOpcode, &lArg1, &lArg2, &lArg3, &lArg4);
 
         /* If cur_address is 0, then we did not find the .orig pseudop yet */
@@ -257,17 +261,18 @@ int convert_to_hex(FILE *infile, FILE *outfile) {
 }
 
 /**
- * @brief Performs the assembler's first pass. Collects labels in a symbol table. 
- * 
- * @param infile Input file 
+ * @brief Performs the assembler's first pass. Collects labels in a symbol table.
+ *
+ * @param infile Input file
  * @return int EXIT_SUCCESS or EXIT_FAILURE
  */
 int generate_symbol_table(FILE *infile) {
     char line_buff[MAX_LINE_LENGTH + 1], *lLabel, *lOpcode, *lArg1, *lArg2, *lArg3, *lArg4;
     int status;
     uint16_t cur_address = 0x0;
-
+    line_num = 0;
     do {
+        line_num++;
         status = readAndParse(infile, line_buff, &lLabel, &lOpcode, &lArg1, &lArg2, &lArg3, &lArg4);
 
         if (cur_address == 0x0) {
@@ -316,7 +321,7 @@ int generate_symbol_table(FILE *infile) {
 
 /**
  * @brief Searches for a label in the symbol table
- * 
+ *
  * @param sym_name Pointer to a string to search for.
  * @return st_entry* The entry in the symbol table.
  */
@@ -364,7 +369,7 @@ int isOpcode(char *in) {
 }
 
 int readAndParse(FILE *pInfile, char *pLine, char **pLabel, char **pOpcode, char **pArg1, char **pArg2, char **pArg3, char **pArg4) {
-    char *lRet, *lPtr;
+    char *lPtr;
     int i;
     if (!fgets(pLine, MAX_LINE_LENGTH, pInfile))
         return (DONE);
@@ -435,7 +440,7 @@ int toNum(char *pStr) {
         t_length = strlen(t_ptr);
         for (k = 0; k < t_length; k++) {
             if (!isdigit(*t_ptr)) {
-                printf("Error: invalid decimal operand, %s\n", orig_pStr);
+                printf("Error: invalid decimal operand, %s, on line %d\n", orig_pStr, line_num);
                 exit(4);
             }
             t_ptr++;
@@ -457,7 +462,7 @@ int toNum(char *pStr) {
         t_length = strlen(t_ptr);
         for (k = 0; k < t_length; k++) {
             if (!isxdigit(*t_ptr)) {
-                printf("Error: invalid hex operand, %s\n", orig_pStr);
+                printf("Error: invalid hex operand, %s, on line %d\n", orig_pStr, line_num);
                 exit(4);
             }
             t_ptr++;
@@ -468,7 +473,7 @@ int toNum(char *pStr) {
             lNum = -lNum;
         return lNum;
     } else {
-        printf("Error: invalid operand, %s\n", orig_pStr);
+        printf("Error: invalid operand, %s, on line %d\n", orig_pStr, line_num);
         exit(4); /* This has been changed from error code 3 to error code 4, see clarification 12 */
     }
 }
