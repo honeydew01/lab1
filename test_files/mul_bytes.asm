@@ -20,7 +20,7 @@ CONTINUE LSHF R1, R1, #1 ; Left shift factor 1
     BR LOOP
     
 EXIT AND R5, R5, #0     ; Clear R5
-    LSHF R5, R3, #8     ; Check top byte for overflow
+    RSHFL R5, R3, #8     ; Check top byte for overflow
     BRz NO_OVERFLOW
     ADD R4, R4, #1      ; Indicate overflow
     
