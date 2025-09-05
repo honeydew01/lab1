@@ -1,5 +1,3 @@
-
-
 .ORIG	x3000
     LEA	R0,	f1_adr      ; Get factor 1 Address
     LDB R1, R0, #0      ; Load factor 1 into R1
