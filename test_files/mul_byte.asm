@@ -21,7 +21,7 @@ CONTINUE LSHF R1, R1, #1 ; Left shift factor 1
     
 EXIT AND R5, R5, #0     ; Clear R5
     LSHF R5, R3, #8     ; Check top byte for overflow
-    BRn NO_OVERFLOW
+    BRz NO_OVERFLOW
     ADD R4, R4, #1      ; Indicate overflow
     
 NO_OVERFLOW LEA R1, P_adr ; Get product address
