@@ -19,10 +19,10 @@ CONTINUE LSHF R1, R1, #1 ; Left shift factor 1
     
 EXIT AND R5, R5, #0     ; Clear R5
     RSHFL R5, R3, #8     ; Check top byte for overflow
-    BRz NO_OVERFLOW
+    BRz NOOVERFLOW      ; got rid of underscore since it's not alphanumeric
     ADD R4, R4, #1      ; Indicate overflow
     
-NO_OVERFLOW LEA R1, P_adr ; Get product address
+NOOVERFLOW LEA R1, P_adr ; Get product address
     STB R3, R1, #0      ; Store product into memory
     LEA R1, OF_adr      ; Get overflow address
     STB R4, R1, #0      ; Store overflow into memory
